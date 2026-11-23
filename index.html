@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#050507" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png" />
+  <title>Matrix — Expense, Debt &amp; Amma Ledger</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans Tamil', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body {
+      background-color: #050507;
+      color: #f4f4f6;
+      font-family: 'Inter', 'Noto Sans Tamil', sans-serif;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #050507; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    @keyframes tabEnter {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.95); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-tab { animation: tabEnter 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .animate-pop { animation: popIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .animate-dropdown { animation: slideDown 0.16s ease-out forwards; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#050507] text-zinc-100 select-none">
+
+  <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md pointer-events-none flex flex-col gap-2"></div>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div class="w-full max-w-sm rounded-3xl bg-[#0b0d12] border border-slate-800 p-5 shadow-2xl animate-pop">
+      <h3 id="confirm-title" class="text-base font-bold text-white">Confirm Action</h3>
+      <p id="confirm-message" class="mt-2 text-sm text-slate-400 leading-relaxed">Are you sure?</p>
+      <div class="mt-5 flex items-center justify-end gap-3">
+        <button type="button" id="confirm-cancel" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-sm font-medium text-slate-300 transition">Cancel</button>
+        <button type="button" id="confirm-ok" class="px-4 py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-sm font-extrabold text-black transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Settle Debt Modal -->
+  <div id="settle-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div class="w-full max-w-sm rounded-3xl bg-[#0b0d12] border border-sky-400/35 p-5 shadow-2xl animate-pop">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="settle-title" class="text-base font-bold text-white">Quick Settle</h3>
+        <button type="button" onclick="closeSettleModal()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900 transition">Close</button>
+      </div>
+      <p id="settle-subtitle" class="text-xs text-slate-400 mb-3"></p>
+      <form onsubmit="submitQuickSettle(event)" class="space-y-3">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Amount Paying / Receiving Now (₹)</label>
+          <input type="number" step="any" min="0.01" id="settle-amount" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-base font-bold text-sky-400 transition" required />
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Mode</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="settle-mode" value="GPay" class="peer sr-only" checked />
+              <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-400 transition">GPay</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="settle-mode" value="Wallet" class="peer sr-only" />
+              <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-white transition">Wallet</div>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Note (Optional)</label>
+          <input type="text" id="settle-note" placeholder="e.g. Partial payment" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3 py-2 text-xs text-white transition" />
+        </div>
+        <button type="submit" class="w-full py-3 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.98] text-black font-extrabold text-sm transition">
+          Confirm Settlement
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Total Breakdown Modal (Personal vs Normal) -->
+  <div id="total-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div class="w-full max-w-md rounded-3xl bg-[#0b0d12] border border-sky-400/40 p-5 shadow-2xl animate-pop max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-extrabold text-white">Expense Total Breakdown</h3>
+          <p id="total-modal-month" class="text-[11px] text-sky-400 font-semibold"></p>
+        </div>
+        <button type="button" onclick="closeTotalModal()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900 transition">Close</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5 mb-3">
+        <button type="button" onclick="selectTotalCategory('Personal')" id="tcat-Personal" class="py-2.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold transition">
+          Personal
+        </button>
+        <button type="button" onclick="selectTotalCategory('Normal')" id="tcat-Normal" class="py-2.5 rounded-xl bg-[#050507] border border-slate-800 text-slate-300 text-xs font-bold transition">
+          Normal
+        </button>
+      </div>
+
+      <div class="rounded-2xl bg-[#050507] border border-slate-800/90 p-3 mb-3 flex items-center justify-between">
+        <div>
+          <div id="total-cat-title" class="text-xs font-bold text-slate-300">Personal Total</div>
+          <div id="total-cat-count" class="text-[11px] text-slate-500">0 items</div>
+        </div>
+        <div id="total-cat-amount" class="text-lg font-black text-sky-400">₹0</div>
+      </div>
+
+      <div id="total-cat-items" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
+
+      <div class="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Grand Total</span>
+        <span id="total-modal-grand" class="text-lg font-black text-sky-400">₹0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Entry Modal -->
+  <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+    <div class="w-full max-w-sm rounded-3xl bg-[#0b0d12] border border-sky-400/35 p-5 shadow-2xl animate-pop">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-bold text-white">Edit Entry</h3>
+        <button type="button" onclick="closeEditModal()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900 transition">Close</button>
+      </div>
+      <form onsubmit="saveEditedEntry(event)" class="space-y-3">
+        <div>
+          <label id="edit-text-label" class="block text-[11px] font-medium text-slate-400 mb-1">Description / Note</label>
+          <input type="text" id="edit-text-input" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-sm text-white transition" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Amount (₹)</label>
+          <input type="number" step="any" min="0.01" id="edit-amount-input" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-base font-bold text-sky-400 transition" required />
+        </div>
+        <button type="submit" class="w-full py-3 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.98] text-black font-extrabold text-sm transition">
+          Save Changes
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Top Header -->
+  <header class="sticky top-0 z-30 bg-[#050507]/90 backdrop-blur-md border-b border-slate-900">
+    <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <img src="./icons/icon-192.png" alt="Matrix" class="w-8 h-8 rounded-xl object-cover border border-sky-400/40 shadow-[0_0_12px_rgba(56,189,248,0.3)]" />
+        <div>
+          <h1 class="text-base font-extrabold tracking-tight text-sky-400 leading-none">Matrix</h1>
+          <span id="ist-month-badge" class="text-[10px] text-slate-400 font-semibold">IST Cycle</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button type="button" onclick="exportBackupJSON()" class="px-2.5 py-1.5 rounded-xl bg-[#0b0d12] hover:bg-slate-900 border border-slate-800 text-[11px] font-bold text-sky-400 transition">
+          Export
+        </button>
+        <label class="px-2.5 py-1.5 rounded-xl bg-[#0b0d12] hover:bg-slate-900 border border-slate-800 text-[11px] font-bold text-slate-200 cursor-pointer transition">
+          Import
+          <input type="file" accept=".json" class="hidden" onchange="importBackupJSON(event)" />
+        </label>
+        <button type="button" onclick="promptResetData()" class="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-sky-400 text-[11px] font-semibold transition">
+          Reset
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 w-full max-w-lg mx-auto px-4 pt-4 pb-28">
+
+    <!-- TAB 1: EXPENSES ONLY -->
+    <section id="tab-expenses" class="tab-section animate-tab space-y-4">
+      <div class="rounded-3xl bg-[#0b0d12] border border-slate-800/90 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="text-base font-bold text-white">Add Expense</h2>
+            <p class="text-xs text-slate-400">Auto-logs current mobile date &amp; time</p>
+          </div>
+          <button type="button" onclick="openTotalModal('Personal')" class="px-3.5 py-2 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.98] text-black text-xs font-extrabold shadow-lg shadow-sky-400/15 transition">
+            Total
+          </button>
+        </div>
+
+        <form onsubmit="addExpense(event)" class="space-y-3.5">
+          <div class="relative">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Description</label>
+            <input type="text" id="exp-desc" autocomplete="off" oninput="handleExpenseDescInput(this.value)" onfocus="handleExpenseDescInput(this.value)" onblur="scheduleHideExpenseSuggestions()" placeholder="e.g. Tea, Petrol, Lunch" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-sm text-white placeholder-slate-600 transition" required />
+            <div id="exp-autocomplete-list" class="hidden animate-dropdown absolute left-0 right-0 top-full mt-1 z-20 max-h-44 overflow-y-auto rounded-xl bg-[#0b0d12] border border-sky-400/40 shadow-2xl divide-y divide-slate-800/80"></div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Amount (₹)</label>
+            <input type="number" step="any" min="0.01" id="exp-amount" placeholder="0" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-base font-bold text-white placeholder-slate-600 transition" required />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Category</label>
+              <select id="exp-category" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3 py-2.5 text-sm text-white transition">
+                <option value="Normal">Normal</option>
+                <option value="Personal">Personal</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Payment Mode</label>
+              <select id="exp-mode" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3 py-2.5 text-sm text-white transition">
+                <option value="GPay">GPay</option>
+                <option value="Wallet">Wallet</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full py-3 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.98] text-black font-extrabold text-sm shadow-lg shadow-sky-400/15 transition">
+            Save Expense
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 2: DEBT ONLY -->
+    <section id="tab-debt" class="tab-section hidden animate-tab space-y-4">
+      <div class="rounded-3xl bg-[#0b0d12] border border-slate-800/90 p-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">Debt Entry</h2>
+
+        <form onsubmit="addDebtEntry(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Action Type</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="cursor-pointer">
+                <input type="radio" name="debt-type" value="given" class="peer sr-only" checked />
+                <div class="rounded-xl p-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-400 transition leading-snug">
+                  உங்களிடம் கடன் வாங்கினார்கள்
+                </div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="debt-type" value="taken" class="peer sr-only" />
+                <div class="rounded-xl p-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-400 transition leading-snug">
+                  நீங்கள் வாங்கிய கடன்
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Select Saved Person</label>
+            <select id="debt-person-select" onchange="onSelectSavedPerson(this.value)" class="w-full rounded-xl bg-[#050507] border border-sky-400/35 focus:border-sky-400 focus:outline-none px-3 py-2.5 text-sm text-white transition">
+              <option value="">-- Choose saved person --</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Person Name</label>
+            <input type="text" id="debt-person-name" placeholder="Enter or select person name" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-sm text-white placeholder-slate-600 transition" required />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Amount (₹)</label>
+            <input type="number" step="any" min="0.01" id="debt-amount" placeholder="Enter amount" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-base font-bold text-white placeholder-slate-600 transition" required />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Description (Optional)</label>
+            <input type="text" id="debt-note" placeholder="e.g. Mobile recharge, Shop balance, Petrol" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-sm text-white placeholder-slate-600 transition" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Mode</label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="cursor-pointer">
+                <input type="radio" name="debt-mode" value="Wallet" class="peer sr-only" checked />
+                <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-400 transition">Wallet</div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="debt-mode" value="GPay" class="peer sr-only" />
+                <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-400 transition">GPay</div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="debt-mode" value="Pay Later" class="peer sr-only" />
+                <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-300 transition">Pay Later</div>
+              </label>
+            </div>
+            <p id="paylater-hint" class="text-[11px] text-sky-300/80 mt-1.5 hidden">
+              Pay Later: ரீசார்ஜ் / கடை பாக்கி (Direct debt record).
+            </p>
+          </div>
+
+          <button type="submit" class="w-full py-3 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.98] text-black font-extrabold text-sm shadow-lg shadow-sky-400/15 transition">
+            Save Debt Entry
+          </button>
+        </form>
+      </div>
+
+      <div id="debt-alerts-section" class="space-y-2.5"></div>
+
+      <div class="rounded-3xl bg-[#0b0d12] border border-slate-800/90 p-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3">Person-Wise Net Summary</h3>
+        <div id="person-net-summary" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: AMMA SETTLEMENT ONLY -->
+    <section id="tab-amma" class="tab-section hidden animate-tab space-y-4">
+      <div class="rounded-3xl bg-[#0b0d12] border border-sky-400/35 p-4">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Amma Monthly Settled (IST)</div>
+        <div id="amma-grand-total" class="text-3xl font-black text-sky-400 mt-1">₹0</div>
+        <div class="grid grid-cols-2 gap-2.5 mt-3 pt-3 border-t border-slate-800/80">
+          <div class="rounded-xl bg-[#050507] border border-slate-800/80 p-2.5">
+            <div class="text-[10px] text-slate-400 font-semibold">Via GPay</div>
+            <div id="amma-gpay-total" class="text-sm font-extrabold text-sky-400 mt-0.5">₹0</div>
+          </div>
+          <div class="rounded-xl bg-[#050507] border border-slate-800/80 p-2.5">
+            <div class="text-[10px] text-slate-400 font-semibold">Via Wallet</div>
+            <div id="amma-wallet-total" class="text-sm font-extrabold text-white mt-0.5">₹0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-3xl bg-[#0b0d12] border border-slate-800/90 p-4">
+        <h2 class="text-sm font-bold text-white mb-3">Weekly Amma Settlement</h2>
+        <form onsubmit="addAmmaSettlement(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Payment Method</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="cursor-pointer">
+                <input type="radio" name="amma-mode" value="GPay" class="peer sr-only" checked />
+                <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-sky-400 transition">GPay</div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="amma-mode" value="Wallet" class="peer sr-only" />
+                <div class="rounded-xl py-2.5 text-center text-xs font-bold border border-slate-800 bg-[#050507] text-slate-400 peer-checked:border-sky-400 peer-checked:bg-sky-400/15 peer-checked:text-white transition">Wallet</div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Settlement Amount (₹)</label>
+            <input type="number" step="any" min="0.01" id="amma-amount" placeholder="Enter amount" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-base font-bold text-white placeholder-slate-600 transition" required />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Note (Optional)</label>
+            <input type="text" id="amma-note" placeholder="e.g. Week 1 home share" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-3.5 py-2.5 text-sm text-white placeholder-slate-600 transition" />
+          </div>
+
+          <button type="submit" class="w-full py-3 rounded-xl bg-sky-400 hover:bg-sky-300 active:scale-[0.98] text-black font-extrabold text-sm shadow-lg shadow-sky-400/15 transition">
+            Settle to Amma
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 4: HISTORY ONLY -->
+    <section id="tab-history" class="tab-section hidden animate-tab space-y-3.5">
+      <div class="rounded-3xl bg-[#0b0d12] border border-slate-800/90 p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-white">History</h2>
+            <p class="text-[11px] text-slate-400">Pick Date or Month to inspect records</p>
+          </div>
+          <div id="history-match-summary" class="rounded-xl bg-sky-400/15 border border-sky-400/35 px-2.5 py-1.5 text-[11px] font-bold text-sky-400">
+            0x • ₹0
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Pick Date</label>
+            <input type="date" id="history-date-picker" onchange="onHistoryDatePicked(this.value)" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-2.5 py-2 text-xs font-bold text-sky-400" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Pick Month</label>
+            <input type="month" id="history-month-picker" onchange="onHistoryMonthPicked(this.value)" class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none px-2.5 py-2 text-xs font-bold text-slate-200" />
+          </div>
+        </div>
+
+        <div class="relative">
+          <input type="text" id="history-search-input" autocomplete="off" oninput="renderHistoryList()" placeholder="Search item, Personal/Normal, person, Amma..." class="w-full rounded-xl bg-[#050507] border border-slate-800 focus:border-sky-400 focus:outline-none pl-3.5 pr-8 py-2 text-xs text-white placeholder-slate-500 transition" />
+          <button type="button" onclick="clearHistorySearch()" id="history-search-clear" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs font-bold">✕</button>
+        </div>
+
+        <div class="grid grid-cols-4 gap-1.5">
+          <button type="button" onclick="selectHistoryTypeFilter('all')" id="hfilter-all" class="py-1.5 rounded-xl bg-sky-400 text-black text-[11px] font-extrabold transition">All</button>
+          <button type="button" onclick="selectHistoryTypeFilter('expenses')" id="hfilter-expenses" class="py-1.5 rounded-xl bg-[#050507] border border-slate-800 text-slate-300 text-[11px] font-semibold transition">Expenses</button>
+          <button type="button" onclick="selectHistoryTypeFilter('debts')" id="hfilter-debts" class="py-1.5 rounded-xl bg-[#050507] border border-slate-800 text-slate-300 text-[11px] font-semibold transition">Debt</button>
+          <button type="button" onclick="selectHistoryTypeFilter('amma')" id="hfilter-amma" class="py-1.5 rounded-xl bg-[#050507] border border-slate-800 text-slate-300 text-[11px] font-semibold transition">Amma</button>
+        </div>
+      </div>
+
+      <div id="history-list-container" class="space-y-2.5"></div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation (4 Tabs: Expenses, Debt, Amma, History) -->
+  <nav class="fixed bottom-0 left-0 right-0 z-30 bg-[#050507]/95 backdrop-blur-md border-t border-slate-900">
+    <div class="max-w-lg mx-auto grid grid-cols-4">
+      <button type="button" onclick="switchTab('expenses')" id="nav-expenses" class="py-3.5 text-xs font-extrabold text-sky-400 border-t-2 border-sky-400 transition">Expenses</button>
+      <button type="button" onclick="switchTab('debt')" id="nav-debt" class="py-3.5 text-xs font-semibold text-slate-400 border-t-2 border-transparent transition">Debt</button>
+      <button type="button" onclick="switchTab('amma')" id="nav-amma" class="py-3.5 text-xs font-semibold text-slate-400 border-t-2 border-transparent transition">Amma</button>
+      <button type="button" onclick="switchTab('history')" id="nav-history" class="py-3.5 text-xs font-semibold text-slate-400 border-t-2 border-transparent transition">History</button>
+    </div>
+  </nav>
+
+  <script>
+    const STORAGE_KEY = 'matrix_ledger_v1';
+    const IDB_NAME = 'matrix_ledger_db';
+    const IDB_STORE = 'snapshots';
+
+    function getISTParts(date = new Date()) {
+      const fmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const parts = fmt.formatToParts(date);
+      const y = parts.find(p => p.type === 'year').value;
+      const m = parts.find(p => p.type === 'month').value;
+      const d = parts.find(p => p.type === 'day').value;
+      return { isoDate: `${y}-${m}-${d}`, ym: `${y}-${m}`, displayDate: `${d}/${m}/${y}` };
+    }
+
+    function getDefaultData() {
+      return {
+        expenses: [],
+        contacts: [],
+        debts: [],
+        ammaSettlements: []
+      };
+    }
+
+    let appData = loadData();
+    let currentHistoryFilter = 'all';
+    let currentTotalCategory = 'Personal';
+    let activeSettleContext = null;
+    let activeEditContext = null;
+    let lastKnownISTMonth = getISTParts().ym;
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return getDefaultData();
+        return { ...getDefaultData(), ...JSON.parse(raw) };
+      } catch {
+        return getDefaultData();
+      }
+    }
+
+    function persistToIDB(snapshot) {
+      try {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => {
+          const tx = req.result.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).put({ id: 'latest', payload: snapshot, updatedAt: Date.now() });
+        };
+      } catch {}
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+      } catch {}
+      persistToIDB(appData);
+    }
+
+    function fmt(n) {
+      const val = Number(n) || 0;
+      return (val < 0 ? '-₹' : '₹') + Math.abs(val).toLocaleString('en-IN');
+    }
+
+    function showToast(msg, isError = false) {
+      const c = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = `animate-pop px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg border ${
+        isError ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-[#0b0d12] border-sky-400/60 text-sky-300'
+      }`;
+      el.textContent = msg;
+      c.appendChild(el);
+      setTimeout(() => el.remove(), 2300);
+    }
+
+    function checkISTMonthRollover() {
+      const nowIST = getISTParts();
+      document.getElementById('ist-month-badge').textContent = `IST ${nowIST.ym}`;
+      if (nowIST.ym !== lastKnownISTMonth) {
+        lastKnownISTMonth = nowIST.ym;
+        renderAll();
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') checkISTMonthRollover();
+    });
+    setInterval(checkISTMonthRollover, 30000);
+
+    function calculatePersonNets() {
+      const map = {};
+      for (const c of appData.contacts) map[c] = 0;
+      for (const d of appData.debts) {
+        const name = d.person;
+        if (!(name in map)) map[name] = 0;
+        const amt = Number(d.amount) || 0;
+        if (d.type === 'given') map[name] += amt;
+        else if (d.type === 'repaid') map[name] -= amt;
+        else if (d.type === 'taken') map[name] -= amt;
+        else if (d.type === 'paid') map[name] += amt;
+      }
+      return map;
+    }
+
+    function renderAll() {
+      const ist = getISTParts();
+      document.getElementById('ist-month-badge').textContent = `IST ${ist.ym}`;
+
+      const monthAmma = appData.ammaSettlements.filter(a => (a.ym || (a.isoDate || '').slice(0, 7)) === ist.ym);
+      let ammaTotal = 0, ammaGpay = 0, ammaWallet = 0;
+      for (const a of monthAmma) {
+        const amt = Number(a.amount) || 0;
+        ammaTotal += amt;
+        if (a.mode === 'GPay') ammaGpay += amt;
+        else ammaWallet += amt;
+      }
+      document.getElementById('amma-grand-total').textContent = fmt(ammaTotal);
+      document.getElementById('amma-gpay-total').textContent = fmt(ammaGpay);
+      document.getElementById('amma-wallet-total').textContent = fmt(ammaWallet);
+
+      const sel = document.getElementById('debt-person-select');
+      const curVal = sel.value;
+      sel.innerHTML = '<option value="">-- Choose saved person --</option>' +
+        appData.contacts.map(c => `<option value="${c}">${c}</option>`).join('');
+      if (appData.contacts.includes(curVal)) sel.value = curVal;
+
+      const nets = calculatePersonNets();
+      const entries = Object.entries(nets).filter(([, v]) => v !== 0);
+      const youOweList = entries.filter(([, v]) => v < 0);
+      const toCollectList = entries.filter(([, v]) => v > 0);
+
+      let alertsHtml = '';
+      for (const [person, v] of youOweList) {
+        const amt = Math.abs(v);
+        alertsHtml += `
+          <div class="rounded-2xl bg-[#0b0d12] border border-slate-700 p-3 flex items-center justify-between gap-2 animate-pop">
+            <div>
+              <div class="text-xs font-extrabold text-white">⚠ திருப்பித் தர வேண்டும்: ${person}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">You owe ${fmt(amt)}</div>
+            </div>
+            <button type="button" onclick="openSettleModal('${person.replace(/'/g, "\'")}', ${amt}, 'paid')" class="shrink-0 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-white text-black text-xs font-extrabold transition">
+              Pay
+            </button>
+          </div>
+        `;
+      }
+      for (const [person, amt] of toCollectList) {
+        alertsHtml += `
+          <div class="rounded-2xl bg-[#0b0d12] border border-sky-400/45 p-3 flex items-center justify-between gap-2 animate-pop">
+            <div>
+              <div class="text-xs font-extrabold text-sky-400">🔔 திருப்பிக் கேளுங்கள்: ${person}</div>
+              <div class="text-[11px] text-sky-200/80 mt-0.5">Owes you ${fmt(amt)}</div>
+            </div>
+            <button type="button" onclick="openSettleModal('${person.replace(/'/g, "\'")}', ${amt}, 'repaid')" class="shrink-0 px-3 py-1.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-black text-xs font-extrabold transition">
+              Collect
+            </button>
+          </div>
+        `;
+      }
+      document.getElementById('debt-alerts-section').innerHTML = alertsHtml;
+
+      const summaryEl = document.getElementById('person-net-summary');
+      if (entries.length === 0) {
+        summaryEl.innerHTML = '<div class="text-xs text-slate-500 text-center py-3">All debts settled!</div>';
+      } else {
+        summaryEl.innerHTML = entries.map(([person, net]) => `
+          <div class="rounded-2xl bg-[#050507] border border-slate-800/90 px-3.5 py-2.5 flex items-center justify-between">
+            <div>
+              <div class="text-sm font-bold text-white">${person}</div>
+              <div class="text-[11px] text-slate-400">${net < 0 ? `You owe: ${fmt(Math.abs(net))}` : `Owes you: ${fmt(net)}`}</div>
+            </div>
+            <div class="text-sm font-extrabold ${net < 0 ? 'text-slate-200' : 'text-sky-400'}">
+              ${net < 0 ? fmt(net) : '+' + fmt(net)}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      renderHistoryList();
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-section').forEach(s => {
+        s.classList.add('hidden');
+        s.classList.remove('animate-tab');
+      });
+      const activeSec = document.getElementById(`tab-${tab}`);
+      activeSec.classList.remove('hidden');
+      void activeSec.offsetWidth;
+      activeSec.classList.add('animate-tab');
+
+      ['expenses', 'debt', 'amma', 'history'].forEach(t => {
+        const btn = document.getElementById(`nav-${t}`);
+        btn.className = t === tab
+          ? 'py-3.5 text-xs font-extrabold text-sky-400 border-t-2 border-sky-400 transition'
+          : 'py-3.5 text-xs font-semibold text-slate-400 border-t-2 border-transparent transition';
+      });
+
+      if (tab === 'history') renderHistoryList();
+    }
+
+    function openTotalModal(defaultCat = 'Personal') {
+      currentTotalCategory = defaultCat;
+      document.getElementById('total-modal').classList.remove('hidden');
+      document.getElementById('total-modal').classList.add('flex');
+      selectTotalCategory(defaultCat);
+    }
+
+    function closeTotalModal() {
+      document.getElementById('total-modal').classList.add('hidden');
+      document.getElementById('total-modal').classList.remove('flex');
+    }
+
+    function selectTotalCategory(cat) {
+      currentTotalCategory = cat;
+      const ist = getISTParts();
+      document.getElementById('total-modal-month').textContent = `Current IST Month: ${ist.ym}`;
+
+      ['Personal', 'Normal'].forEach(c => {
+        const btn = document.getElementById(`tcat-${c}`);
+        btn.className = c === cat
+          ? 'py-2.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold transition'
+          : 'py-2.5 rounded-xl bg-[#050507] border border-slate-800 text-slate-300 text-xs font-bold transition';
+      });
+
+      const monthExpenses = appData.expenses.filter(e => (e.ym || (e.isoDate || '').slice(0, 7)) === ist.ym);
+      const personalItems = monthExpenses.filter(e => e.category === 'Personal');
+      const normalItems = monthExpenses.filter(e => e.category !== 'Personal');
+
+      const personalSum = personalItems.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const normalSum = normalItems.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const grandTotal = personalSum + normalSum;
+
+      const activeItems = cat === 'Personal' ? personalItems : normalItems;
+      const activeSum = cat === 'Personal' ? personalSum : normalSum;
+
+      document.getElementById('total-cat-title').textContent = `${cat} Total`;
+      document.getElementById('total-cat-count').textContent = `${activeItems.length} ${activeItems.length === 1 ? 'item' : 'items'}`;
+      document.getElementById('total-cat-amount').textContent = fmt(activeSum);
+      document.getElementById('total-modal-grand').textContent = fmt(grandTotal);
+
+      const listBox = document.getElementById('total-cat-items');
+      if (activeItems.length === 0) {
+        listBox.innerHTML = `<div class="text-xs text-slate-500 text-center py-6">No ${cat} expenses in ${ist.ym}.</div>`;
+      } else {
+        listBox.innerHTML = activeItems.map(item => `
+          <div class="rounded-xl bg-[#050507] border border-slate-800/90 px-3 py-2.5 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-white truncate">${item.desc}</div>
+              <div class="text-[10px] text-slate-400">${item.date} • ${item.mode}</div>
+            </div>
+            <div class="text-xs font-extrabold text-sky-400 shrink-0">${fmt(item.amount)}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function handleExpenseDescInput(val) {
+      const box = document.getElementById('exp-autocomplete-list');
+      const query = val.trim().toLowerCase();
+      if (!query) {
+        box.classList.add('hidden');
+        return;
+      }
+      const unique = [...new Set(appData.expenses.map(e => e.desc))];
+      const starts = unique.filter(u => u.toLowerCase().startsWith(query));
+      const contains = unique.filter(u => !u.toLowerCase().startsWith(query) && u.toLowerCase().includes(query));
+      const matches = [...starts, ...contains];
+
+      if (matches.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+      box.innerHTML = matches.map(m => `
+        <button type="button" onmousedown="pickExpenseSuggestion('${m.replace(/'/g, "\'")}')" class="w-full text-left px-3.5 py-2.5 text-xs font-semibold text-sky-300 hover:bg-slate-900 flex items-center justify-between transition">
+          <span>${m}</span>
+          <span class="text-[10px] text-slate-500">Saved</span>
+        </button>
+      `).join('');
+      box.classList.remove('hidden');
+    }
+
+    function pickExpenseSuggestion(val) {
+      document.getElementById('exp-desc').value = val;
+      document.getElementById('exp-autocomplete-list').classList.add('hidden');
+    }
+
+    function scheduleHideExpenseSuggestions() {
+      setTimeout(() => document.getElementById('exp-autocomplete-list').classList.add('hidden'), 150);
+    }
+
+    function addExpense(e) {
+      e.preventDefault();
+      const desc = document.getElementById('exp-desc').value.trim();
+      const amount = Number(document.getElementById('exp-amount').value);
+      const category = document.getElementById('exp-category').value;
+      const mode = document.getElementById('exp-mode').value;
+      const ist = getISTParts();
+
+      appData.expenses.unshift({
+        id: Date.now().toString(),
+        desc,
+        amount,
+        category,
+        mode,
+        isoDate: ist.isoDate,
+        ym: ist.ym,
+        date: ist.displayDate
+      });
+      saveData();
+      document.getElementById('exp-desc').value = '';
+      document.getElementById('exp-amount').value = '';
+      renderAll();
+      showToast(`Saved ${desc}: ${fmt(amount)}`);
+    }
+
+    function addAmmaSettlement(e) {
+      e.preventDefault();
+      const mode = document.querySelector('input[name="amma-mode"]:checked').value;
+      const amount = Number(document.getElementById('amma-amount').value);
+      const note = document.getElementById('amma-note').value.trim();
+      const ist = getISTParts();
+
+      appData.ammaSettlements.unshift({
+        id: Date.now().toString(),
+        mode,
+        amount,
+        note: note || 'Weekly Amma Settlement',
+        isoDate: ist.isoDate,
+        ym: ist.ym,
+        date: ist.displayDate
+      });
+      saveData();
+      document.getElementById('amma-amount').value = '';
+      document.getElementById('amma-note').value = '';
+      renderAll();
+      showToast(`Settled ${fmt(amount)} to Amma via ${mode}`);
+    }
+
+    function onSelectSavedPerson(val) {
+      if (val) document.getElementById('debt-person-name').value = val;
+    }
+
+    document.querySelectorAll('input[name="debt-mode"]').forEach(r => {
+      r.addEventListener('change', () => {
+        document.getElementById('paylater-hint').classList.toggle('hidden', r.value !== 'Pay Later');
+      });
+    });
+
+    function addDebtEntry(e) {
+      e.preventDefault();
+      const type = document.querySelector('input[name="debt-type"]:checked').value;
+      const person = document.getElementById('debt-person-name').value.trim();
+      const amount = Number(document.getElementById('debt-amount').value);
+      const note = document.getElementById('debt-note').value.trim();
+      const mode = document.querySelector('input[name="debt-mode"]:checked').value;
+      if (!person) return;
+
+      const existing = appData.contacts.find(c => c.toLowerCase() === person.toLowerCase());
+      const finalName = existing || person;
+      if (!existing) appData.contacts.push(finalName);
+
+      const ist = getISTParts();
+      appData.debts.unshift({
+        id: Date.now().toString(),
+        type,
+        person: finalName,
+        amount,
+        mode,
+        note,
+        isoDate: ist.isoDate,
+        ym: ist.ym,
+        date: ist.displayDate
+      });
+      saveData();
+      document.getElementById('debt-amount').value = '';
+      document.getElementById('debt-note').value = '';
+      renderAll();
+      showToast(`Debt saved for ${finalName} (${mode})`);
+    }
+
+    function openSettleModal(person, remainingAmt, type) {
+      activeSettleContext = { person, type };
+      document.getElementById('settle-title').textContent = type === 'paid' ? `Pay Back ${person}` : `Collect from ${person}`;
+      document.getElementById('settle-subtitle').textContent = `Remaining balance: ${fmt(remainingAmt)}`;
+      document.getElementById('settle-amount').value = remainingAmt;
+      document.getElementById('settle-note').value = '';
+      document.getElementById('settle-modal').classList.remove('hidden');
+      document.getElementById('settle-modal').classList.add('flex');
+    }
+
+    function closeSettleModal() {
+      document.getElementById('settle-modal').classList.add('hidden');
+      document.getElementById('settle-modal').classList.remove('flex');
+      activeSettleContext = null;
+    }
+
+    function submitQuickSettle(e) {
+      e.preventDefault();
+      if (!activeSettleContext) return;
+      const amount = Number(document.getElementById('settle-amount').value);
+      const mode = document.querySelector('input[name="settle-mode"]:checked').value;
+      const note = document.getElementById('settle-note').value.trim();
+      const ist = getISTParts();
+      appData.debts.unshift({
+        id: Date.now().toString(),
+        type: activeSettleContext.type,
+        person: activeSettleContext.person,
+        amount,
+        mode,
+        note: note || 'Quick Settle',
+        isoDate: ist.isoDate,
+        ym: ist.ym,
+        date: ist.displayDate
+      });
+      saveData();
+      closeSettleModal();
+      renderAll();
+      showToast(`Settled ${fmt(amount)} via ${mode}`);
+    }
+
+    function onHistoryDatePicked(isoVal) {
+      if (isoVal) {
+        document.getElementById('history-month-picker').value = '';
+      }
+      renderHistoryList();
+    }
+
+    function onHistoryMonthPicked(ymVal) {
+      if (ymVal) {
+        document.getElementById('history-date-picker').value = '';
+      }
+      renderHistoryList();
+    }
+
+    function selectHistoryTypeFilter(filterKey) {
+      currentHistoryFilter = filterKey;
+      ['all', 'expenses', 'debts', 'amma'].forEach(k => {
+        const btn = document.getElementById(`hfilter-${k}`);
+        if (!btn) return;
+        btn.className = k === filterKey
+          ? 'py-1.5 rounded-xl bg-sky-400 text-black text-[11px] font-extrabold transition'
+          : 'py-1.5 rounded-xl bg-[#050507] border border-slate-800 text-slate-300 text-[11px] font-semibold transition';
+      });
+      renderHistoryList();
+    }
+
+    function clearHistorySearch() {
+      const inp = document.getElementById('history-search-input');
+      if (inp) inp.value = '';
+      document.getElementById('history-date-picker').value = '';
+      document.getElementById('history-month-picker').value = '';
+      renderHistoryList();
+    }
+
+    function deleteHistoryItem(kind, id) {
+      if (kind === 'expenses') appData.expenses = appData.expenses.filter(x => x.id !== id);
+      else if (kind === 'debts') appData.debts = appData.debts.filter(x => x.id !== id);
+      else if (kind === 'amma') appData.ammaSettlements = appData.ammaSettlements.filter(x => x.id !== id);
+      saveData();
+      renderAll();
+      showToast('Entry deleted');
+    }
+
+    function openEditModal(kind, id) {
+      activeEditContext = { kind, id };
+      let item = null;
+      if (kind === 'expenses') item = appData.expenses.find(x => x.id === id);
+      else if (kind === 'debts') item = appData.debts.find(x => x.id === id);
+      else if (kind === 'amma') item = appData.ammaSettlements.find(x => x.id === id);
+      if (!item) return;
+
+      document.getElementById('edit-amount-input').value = item.amount;
+      if (kind === 'expenses') {
+        document.getElementById('edit-text-label').textContent = 'Description';
+        document.getElementById('edit-text-input').value = item.desc || '';
+      } else {
+        document.getElementById('edit-text-label').textContent = 'Note / Description';
+        document.getElementById('edit-text-input').value = item.note || '';
+      }
+      document.getElementById('edit-modal').classList.remove('hidden');
+      document.getElementById('edit-modal').classList.add('flex');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+      document.getElementById('edit-modal').classList.remove('flex');
+      activeEditContext = null;
+    }
+
+    function saveEditedEntry(e) {
+      e.preventDefault();
+      if (!activeEditContext) return;
+      const { kind, id } = activeEditContext;
+      const amt = Number(document.getElementById('edit-amount-input').value);
+      const txt = document.getElementById('edit-text-input').value.trim();
+
+      if (kind === 'expenses') {
+        const item = appData.expenses.find(x => x.id === id);
+        if (item) { item.amount = amt; item.desc = txt || item.desc; }
+      } else if (kind === 'debts') {
+        const item = appData.debts.find(x => x.id === id);
+        if (item) { item.amount = amt; item.note = txt; }
+      } else if (kind === 'amma') {
+        const item = appData.ammaSettlements.find(x => x.id === id);
+        if (item) { item.amount = amt; item.note = txt; }
+      }
+      saveData();
+      closeEditModal();
+      renderAll();
+      showToast('Entry updated!');
+    }
+
+    function renderHistoryList() {
+      const box = document.getElementById('history-list-container');
+      const searchEl = document.getElementById('history-search-input');
+      const clearBtn = document.getElementById('history-search-clear');
+      const sumEl = document.getElementById('history-match-summary');
+      const pickedDate = document.getElementById('history-date-picker').value;
+      const pickedMonth = document.getElementById('history-month-picker').value;
+      const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+      if (clearBtn) clearBtn.classList.toggle('hidden', !q && !pickedDate && !pickedMonth);
+
+      const debtLabels = { given: 'Given Loan', repaid: 'Loan Repaid', taken: 'Taken Loan', paid: 'Debt Paid' };
+      const combined = [];
+
+      for (const e of appData.expenses) {
+        const catBadge = e.category === 'Personal'
+          ? '<span class="px-2 py-0.5 rounded-md bg-sky-400/15 border border-sky-400/40 text-[10px] font-extrabold text-sky-400">Personal</span>'
+          : '<span class="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-slate-200">Normal</span>';
+        combined.push({
+          kind: 'expenses',
+          id: e.id,
+          ts: Number(e.id) || 0,
+          isoDate: e.isoDate || '',
+          ym: e.ym || (e.isoDate || '').slice(0, 7),
+          titleHtml: `<div class="flex items-center gap-2 min-w-0"><span class="text-sm font-bold text-white truncate">${e.desc}</span>${catBadge}</div>`,
+          sub: `${e.date} • ${e.mode}`,
+          amountVal: Number(e.amount) || 0,
+          amountLabel: fmt(e.amount),
+          accentClass: 'text-sky-400',
+          searchText: `${e.desc} ${e.category} ${e.mode} ${e.date} ${e.isoDate || ''}`.toLowerCase()
+        });
+      }
+
+      for (const d of appData.debts) {
+        const isCollect = (d.type === 'given' || d.type === 'paid');
+        combined.push({
+          kind: 'debts',
+          id: d.id,
+          ts: Number(d.id) || 0,
+          isoDate: d.isoDate || '',
+          ym: d.ym || (d.isoDate || '').slice(0, 7),
+          titleHtml: `<div class="flex items-center gap-2 min-w-0"><span class="text-sm font-bold text-white truncate">${d.person}</span><span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-[10px] font-bold text-slate-300">${debtLabels[d.type] || 'Debt'}</span></div>`,
+          sub: `${d.date} • ${d.mode}${d.note ? ' • ' + d.note : ''}`,
+          amountVal: Number(d.amount) || 0,
+          amountLabel: fmt(d.amount),
+          accentClass: isCollect ? 'text-sky-400' : 'text-slate-200',
+          searchText: `${d.person} ${d.note || ''} ${debtLabels[d.type] || ''} ${d.mode} ${d.date} ${d.isoDate || ''}`.toLowerCase()
+        });
+      }
+
+      for (const a of appData.ammaSettlements) {
+        combined.push({
+          kind: 'amma',
+          id: a.id,
+          ts: Number(a.id) || 0,
+          isoDate: a.isoDate || '',
+          ym: a.ym || (a.isoDate || '').slice(0, 7),
+          titleHtml: `<div class="flex items-center gap-2 min-w-0"><span class="text-sm font-bold text-white truncate">Amma</span><span class="px-2 py-0.5 rounded-md bg-sky-400/15 border border-sky-400/40 text-[10px] font-extrabold text-sky-400">Amma</span></div>`,
+          sub: `${a.date} • ${a.mode}${a.note ? ' • ' + a.note : ''}`,
+          amountVal: Number(a.amount) || 0,
+          amountLabel: fmt(a.amount),
+          accentClass: 'text-sky-400',
+          searchText: `amma ${a.note || ''} ${a.mode} ${a.date} ${a.isoDate || ''}`.toLowerCase()
+        });
+      }
+
+      combined.sort((a, b) => b.ts - a.ts);
+
+      const list = combined.filter(item => {
+        const typeOk = currentHistoryFilter === 'all' || item.kind === currentHistoryFilter;
+        const dateOk = !pickedDate || item.isoDate === pickedDate;
+        const monthOk = !pickedMonth || item.ym === pickedMonth;
+        const textOk = !q || item.searchText.includes(q);
+        return typeOk && dateOk && monthOk && textOk;
+      });
+
+      const totalAmt = list.reduce((s, item) => s + item.amountVal, 0);
+      if (sumEl) sumEl.textContent = `${list.length}x • ${fmt(totalAmt)}`;
+
+      if (list.length === 0) {
+        box.innerHTML = `<div class="text-xs text-slate-500 text-center py-8">No matching entries found.</div>`;
+        return;
+      }
+
+      box.innerHTML = list.map(item => `
+        <div class="rounded-2xl bg-[#0b0d12] border border-slate-800/90 p-3 flex items-center justify-between gap-3 animate-pop">
+          <div class="min-w-0 flex-1">
+            ${item.titleHtml}
+            <div class="text-[11px] text-slate-400 mt-0.5 truncate">${item.sub}</div>
+          </div>
+          <div class="text-right shrink-0 flex flex-col items-end">
+            <div class="text-sm font-extrabold ${item.accentClass}">${item.amountLabel}</div>
+            <div class="flex items-center gap-1.5 mt-1.5">
+              <button type="button" onclick="openEditModal('${item.kind}','${item.id}')" class="px-2 py-0.5 rounded-lg bg-[#050507] border border-slate-800 text-[10px] text-slate-300 hover:border-sky-400 transition">Edit</button>
+              <button type="button" onclick="deleteHistoryItem('${item.kind}','${item.id}')" class="px-2 py-0.5 rounded-lg bg-[#050507] border border-slate-800 text-[10px] text-slate-400 hover:text-sky-400 transition">Del</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function exportBackupJSON() {
+      const ist = getISTParts();
+      const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `matrix-backup-${ist.isoDate}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Backup JSON exported!');
+    }
+
+    function importBackupJSON(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          if (!parsed || typeof parsed !== 'object') throw new Error('Invalid');
+          appData = { ...getDefaultData(), ...parsed };
+          saveData();
+          renderAll();
+          showToast('Backup restored!');
+        } catch {
+          showToast('Invalid JSON backup file', true);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function promptResetData() {
+      const m = document.getElementById('confirm-modal');
+      document.getElementById('confirm-title').textContent = 'Reset All Data?';
+      document.getElementById('confirm-message').textContent = 'This will clear all saved expenses, debt, and Amma entries.';
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+      document.getElementById('confirm-cancel').onclick = () => {
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+      };
+      document.getElementById('confirm-ok').onclick = () => {
+        appData = getDefaultData();
+        saveData();
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+        renderAll();
+        showToast('All data cleared');
+      };
+    }
+
+    renderAll();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
